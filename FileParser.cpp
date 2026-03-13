@@ -234,11 +234,6 @@ void FileParser::parseGLSLUniforms(const std::string& sourceCode, std::vector<st
                         }
                     }
 
-                }else if(glslkeywords.count(newString) == 0 && ( structMap.find(newString) == structMap.end() )){//if its not a known type or keyword, but its after
-                    state = STRUCT_INSTANCE_DETECTED;                                                            //curly braces, its an instance of the struct after its definition
-                    currentStructIndex = structList.size()-1;
-                    newExpression = false;
-                    goto begin_switch;
                 }else{
                     state = DEFAULT;
                     structNameRecorded = false;
