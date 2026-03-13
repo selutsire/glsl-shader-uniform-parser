@@ -2,6 +2,7 @@
 
 #include <unordered_set>
 #include <cctype>
+#include <string>
 
 void FileParser::getNextWord(const char* string, 
                             unsigned int index,
@@ -159,6 +160,7 @@ void FileParser::parseGLSLUniforms(const std::string& sourceCode, std::vector<st
     std::vector<std::vector<std::string>> structMemberList;
     std::vector<std::string> structList;
     std::string newString = "";
+    std::string lastKnownSymbol = "";
 
     while(beginTokenIndex >= 0){
         
@@ -181,6 +183,7 @@ void FileParser::parseGLSLUniforms(const std::string& sourceCode, std::vector<st
 
                 }else if( (glslkeywords.count(newString) == 0)){ 
                     uniformVector.push_back(newString);
+                    lastKnownSymbol = newString;
                 }else if(newString == "struct"){
                     state = STRUCT_DETECTED;
                 }
@@ -227,9 +230,27 @@ void FileParser::parseGLSLUniforms(const std::string& sourceCode, std::vector<st
                     state = DEFAULT;
                     goto begin_switch;
                 }
-                if( !(glslkeywords.count(newString) > 0 || std::isdigit(newString[0])) ){
-                    for(int i = 0; i < structMemberList[currentStructIndex].size(); i++){
-                        uniformVector.push_back((newString + "." + structMemberList[currentStructIndex][i]));
+                if( !(glslkeywords.count(newString) > 0) ){
+                    if(std::isdigit(newString[0])){
+                        try{
+                            int instanceCount = (std::stoi(newString));
+                            for(int i = 0; i < structMemberList[currentStructIndex].size(); i++){
+                                uniformVector.pop_back(); //removing the uniforms we had already added, since its an array we have to rewrite
+                            }
+                            for(int i = 0; i < instanceCount; i++){
+                                for(int j = 0; j < structMemberList[currentStructIndex].size(); j++){
+                                    uniformVector.push_back((lastKnownSymbol + "[" + std::to_string(i) + "]." + structMemberList[currentStructIndex][j]));
+                                }
+                            }
+                        }catch(std::exception& e){
+                            state = DEFAULT;
+                            goto begin_switch;
+                        }
+                    }else{
+                        lastKnownSymbol = newString;
+                        for(int i = 0; i < structMemberList[currentStructIndex].size(); i++){
+                            uniformVector.push_back((newString + "." + structMemberList[currentStructIndex][i]));
+                        }
                     }
                 }
             break;
@@ -239,9 +260,28 @@ void FileParser::parseGLSLUniforms(const std::string& sourceCode, std::vector<st
                     state = STRUCT_DETECTED;
                     goto begin_switch;
                 }
-                for(int i = 0; i <= structMemberList[innerCurrentStructIndex].size()-1; i++){
-                    structMemberList[currentStructIndex].push_back( newString + "." + structMemberList[innerCurrentStructIndex][i] );
+                if(!std::isdigit(newString[0])){
+                    lastKnownSymbol = newString;
+                    for(int i = 0; i <= structMemberList[innerCurrentStructIndex].size()-1; i++){
+                        structMemberList[currentStructIndex].push_back( newString + "." + structMemberList[innerCurrentStructIndex][i] );
+                    }
+                }else{
+                    try{
+                        int instanceCount = std::stoi(newString);
+                        for(int i = 0; i < structMemberList[innerCurrentStructIndex].size(); i++){
+                            structMemberList[currentStructIndex].pop_back();
+                        }
+                        for(int i = 0; i < instanceCount; i++){
+                            for(int j = 0; j < structMemberList[innerCurrentStructIndex].size(); j++){
+                                structMemberList[currentStructIndex].push_back( lastKnownSymbol + "[" + std::to_string(i) + "]." + structMemberList[innerCurrentStructIndex][j] );
+                            }
+                        }
+                    }catch(std::exception& e){
+                        state = STRUCT_DETECTED;
+                        goto begin_switch;
+                    }
                 }
+                
             break;
             
             case DEFAULT:
