@@ -177,7 +177,19 @@ void FileParser::parseGLSLUniforms(const std::string& sourceCode, std::vector<st
                 }else if (braceDepth != braceDepthRecord){
                     state = DEFAULT; //if brace depth changed, parser is inside a ubo, dont need to keep parsing
                 }
-                if(structMap.find(newString) != structMap.end()){//if its a known struct type, we found an instance
+                else if(std::isdigit(newString[0])){
+                    try{
+                        int count = std::stoi(newString);
+                        uniformVector.pop_back();
+                        for(int i = 0; i < count; i++){
+                            uniformVector.push_back( lastKnownSymbol + "[" + std::to_string(i) + "]" );
+                        }
+                    }catch(std::exception& e){
+
+                    }
+
+                }
+                else if(structMap.find(newString) != structMap.end()){//if its a known struct type, we found an instance
                     currentStructIndex = structMap[newString];
                     state = STRUCT_INSTANCE_DETECTED;
 
@@ -207,8 +219,19 @@ void FileParser::parseGLSLUniforms(const std::string& sourceCode, std::vector<st
                         
                     }
                     else if( glslkeywords.count(newString) == 0 ){  //if its not a keyword its a struct member
-                        structMemberList[currentStructIndex].push_back(newString);
+                        if(std::isdigit(newString[0])){
+                            try{
+                                int count = std::stoi(newString);
+                                structMemberList[currentStructIndex].pop_back();
+                                for(int i = 0; i < count; i++){
+                                    structMemberList[currentStructIndex].push_back(lastKnownSymbol + "[" + std::to_string(i) + "]");
+                                }
 
+                            }catch(std::exception& e){}                            
+                        }else{
+                            structMemberList[currentStructIndex].push_back(newString);
+                            lastKnownSymbol = newString;
+                        }
                     }
 
                 }else if(glslkeywords.count(newString) == 0 && ( structMap.find(newString) == structMap.end() )){//if its not a known type or keyword, but its after
